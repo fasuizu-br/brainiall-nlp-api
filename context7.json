@@ -1,0 +1,15 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "Brainiall NLP API",
+  "description": "Production NLP API with specialized ONNX models for toxicity detection, sentiment analysis, named entity recognition, PII detection, and language identification at 100-1000x lower cost than LLMs",
+  "folders": [],
+  "excludeFolders": ["dist", "build", ".git", "__pycache__", "models"],
+  "excludeFiles": ["CHANGELOG.md", "LICENSE"],
+  "rules": [
+    "All endpoints accept POST with JSON body containing text field",
+    "Use multipart/form-data for file uploads",
+    "Authentication via Ocp-Apim-Subscription-Key header",
+    "All models run on CPU with ONNX optimization",
+    "Language detection supports 217 languages via fastText"
+  ]
+}
