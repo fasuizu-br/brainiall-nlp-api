@@ -1,0 +1,414 @@
+# Brainiall NLP API — Full Documentation
+
+## Overview
+
+Brainiall NLP API provides a suite of specialized NLP models optimized with ONNX for CPU inference. Each model is purpose-built for a specific task, delivering higher accuracy at 100-1000x lower cost compared to general-purpose LLMs.
+
+All models run on CPU — no GPU required. Typical latency: 30-500ms per request.
+
+## Base URL
+
+https://apim-ai-apis.azure-api.net/v1/nlp
+
+## Authentication
+
+Three authentication methods (use any one):
+
+1. Bearer Token: `Authorization: Bearer YOUR_KEY`
+2. API Key: `api-key: YOUR_KEY`
+3. Subscription Key: `Ocp-Apim-Subscription-Key: YOUR_KEY`
+
+## Endpoints
+
+### POST /toxicity
+
+Detect toxic content across 6 categories.
+
+Request:
+```json
+{"text": "Your text to analyze"}
+```
+
+Response:
+```json
+{
+  "text": "Your text to analyze",
+  "is_toxic": false,
+  "scores": {
+    "toxic": 0.0012,
+    "severe_toxic": 0.0001,
+    "obscene": 0.0005,
+    "threat": 0.0002,
+    "insult": 0.0008,
+    "identity_hate": 0.0001
+  },
+  "max_score": 0.0012,
+  "max_category": "toxic"
+}
+```
+
+Categories:
+- toxic: General toxicity
+- severe_toxic: Extremely toxic content
+- obscene: Obscene language
+- threat: Threatening content
+- insult: Insults
+- identity_hate: Identity-based hate speech
+
+### POST /sentiment
+
+Classify text sentiment.
+
+Request:
+```json
+{"text": "Your text to analyze"}
+```
+
+Response:
+```json
+{
+  "text": "Your text to analyze",
+  "sentiment": "positive",
+  "confidence": 0.9847,
+  "scores": {
+    "positive": 0.9847,
+    "negative": 0.0153
+  }
+}
+```
+
+### POST /entities
+
+Extract named entities using NER.
+
+Request:
+```json
+{"text": "Your text to analyze"}
+```
+
+Response:
+```json
+{
+  "text": "Your text to analyze",
+  "entities": [
+    {"text": "Entity Name", "label": "PER", "start": 0, "end": 11, "score": 0.9987}
+  ],
+  "entity_count": 1
+}
+```
+
+Entity labels:
+- PER: Person names
+- ORG: Organization names
+- LOC: Location names
+- MISC: Miscellaneous entities
+
+### POST /pii
+
+Detect personally identifiable information.
+
+Request:
+```json
+{"text": "Your text to analyze"}
+```
+
+Response:
+```json
+{
+  "text": "Your text to analyze",
+  "pii_found": true,
+  "entities": [
+    {"type": "email", "value": "user@example.com", "start": 10, "end": 26}
+  ],
+  "pii_count": 1
+}
+```
+
+PII types detected:
+- email: Email addresses
+- phone: Phone numbers (US and international formats)
+- ssn: Social Security Numbers
+- credit_card: Credit card numbers
+
+### POST /language
+
+Detect text language from 217 supported languages.
+
+Request:
+```json
+{"text": "Your text to analyze"}
+```
+
+Response:
+```json
+{
+  "text": "Your text to analyze",
+  "language": "en",
+  "confidence": 0.9876,
+  "language_name": "English"
+}
+```
+
+Uses fastText model (lid.176.ftz) for high-speed detection (<1ms typical).
+
+### GET /health
+
+Service health check.
+
+Response:
+```json
+{
+  "status": "healthy",
+  "models": {
+    "toxicity": "loaded",
+    "sentiment": "loaded",
+    "ner": "loaded",
+    "pii": "loaded",
+    "language": "loaded"
+  }
+}
+```
+
+## Code Examples
+
+### Python: Content Moderation Pipeline
+
+```python
+import requests
+
+BASE_URL = "https://apim-ai-apis.azure-api.net/v1/nlp"
+HEADERS = {"Authorization": "Bearer YOUR_KEY", "Content-Type": "application/json"}
+
+def moderate_content(text: str) -> dict:
+    """Run content moderation pipeline: toxicity + PII + language."""
+    # Check toxicity
+    toxicity = requests.post(f"{BASE_URL}/toxicity", headers=HEADERS, json={"text": text}).json()
+
+    # Check for PII
+    pii = requests.post(f"{BASE_URL}/pii", headers=HEADERS, json={"text": text}).json()
+
+    # Detect language
+    language = requests.post(f"{BASE_URL}/language", headers=HEADERS, json={"text": text}).json()
+
+    return {
+        "text": text,
+        "language": language["language"],
+        "is_toxic": toxicity["is_toxic"],
+        "toxic_categories": {k: v for k, v in toxicity["scores"].items() if v > 0.5},
+        "has_pii": pii["pii_found"],
+        "pii_types": [e["type"] for e in pii.get("entities", [])],
+        "action": "block" if toxicity["is_toxic"] else ("redact" if pii["pii_found"] else "allow")
+    }
+
+# Usage
+result = moderate_content("Please contact John at john@example.com for details")
+print(f"Action: {result['action']}")
+print(f"Language: {result['language']}")
+print(f"PII found: {result['pii_types']}")
+```
+
+### Python: Batch Sentiment Analysis
+
+```python
+import requests
+from concurrent.futures import ThreadPoolExecutor
+import time
+
+BASE_URL = "https://apim-ai-apis.azure-api.net/v1/nlp"
+HEADERS = {"Authorization": "Bearer YOUR_KEY", "Content-Type": "application/json"}
+
+reviews = [
+    "Absolutely love this product! Best purchase ever.",
+    "Terrible quality. Broke after one week.",
+    "It's decent for the price. Nothing extraordinary.",
+    "Amazing customer service! They resolved my issue immediately.",
+    "Would not recommend. Very disappointing experience.",
+    "Great value for money. Exactly what I needed.",
+    "The worst experience I've had with any company.",
+    "Exceeded my expectations in every way!",
+]
+
+def analyze(text):
+    resp = requests.post(f"{BASE_URL}/sentiment", headers=HEADERS, json={"text": text})
+    return resp.json()
+
+start = time.time()
+with ThreadPoolExecutor(max_workers=10) as pool:
+    results = list(pool.map(analyze, reviews))
+elapsed = time.time() - start
+
+positive = sum(1 for r in results if r["sentiment"] == "positive")
+negative = len(results) - positive
+print(f"Analyzed {len(reviews)} reviews in {elapsed:.2f}s")
+print(f"Positive: {positive}, Negative: {negative}")
+for text, result in zip(reviews, results):
+    icon = "+" if result["sentiment"] == "positive" else "-"
+    print(f"  [{icon}] {result['confidence']:.3f} | {text[:60]}")
+```
+
+### Python: Entity Extraction Pipeline
+
+```python
+import requests
+
+BASE_URL = "https://apim-ai-apis.azure-api.net/v1/nlp"
+HEADERS = {"Authorization": "Bearer YOUR_KEY", "Content-Type": "application/json"}
+
+def extract_all_entities(text: str) -> dict:
+    """Extract named entities and PII from text."""
+    ner = requests.post(f"{BASE_URL}/entities", headers=HEADERS, json={"text": text}).json()
+    pii = requests.post(f"{BASE_URL}/pii", headers=HEADERS, json={"text": text}).json()
+
+    return {
+        "persons": [e["text"] for e in ner["entities"] if e["label"] == "PER"],
+        "organizations": [e["text"] for e in ner["entities"] if e["label"] == "ORG"],
+        "locations": [e["text"] for e in ner["entities"] if e["label"] == "LOC"],
+        "emails": [e["value"] for e in pii.get("entities", []) if e["type"] == "email"],
+        "phones": [e["value"] for e in pii.get("entities", []) if e["type"] == "phone"],
+    }
+
+text = """
+Tim Cook, CEO of Apple Inc., announced the opening of a new office in Austin, Texas.
+For inquiries, contact press@apple.com or call 1-800-275-2273.
+"""
+entities = extract_all_entities(text)
+print(f"Persons: {entities['persons']}")
+print(f"Organizations: {entities['organizations']}")
+print(f"Locations: {entities['locations']}")
+print(f"Emails: {entities['emails']}")
+print(f"Phones: {entities['phones']}")
+```
+
+### JavaScript: Full NLP Analysis
+
+```javascript
+const BASE_URL = "https://apim-ai-apis.azure-api.net/v1/nlp";
+const HEADERS = {
+  "Content-Type": "application/json",
+  Authorization: "Bearer YOUR_KEY",
+};
+
+async function analyzeText(text) {
+  const endpoints = ["toxicity", "sentiment", "entities", "pii", "language"];
+  const results = {};
+
+  await Promise.all(
+    endpoints.map(async (endpoint) => {
+      const response = await fetch(`${BASE_URL}/${endpoint}`, {
+        method: "POST",
+        headers: HEADERS,
+        body: JSON.stringify({ text }),
+      });
+      results[endpoint] = await response.json();
+    })
+  );
+
+  return {
+    text,
+    language: results.language.language,
+    sentiment: results.sentiment.sentiment,
+    confidence: results.sentiment.confidence,
+    is_toxic: results.toxicity.is_toxic,
+    entity_count: results.entities.entity_count,
+    pii_found: results.pii.pii_found,
+  };
+}
+
+const analysis = await analyzeText(
+  "John from Google in NYC emailed john@google.com — great product!"
+);
+console.log(JSON.stringify(analysis, null, 2));
+```
+
+### curl: All Endpoints
+
+```bash
+BASE="https://apim-ai-apis.azure-api.net/v1/nlp"
+KEY="YOUR_KEY"
+
+# Toxicity
+curl -s -X POST "$BASE/toxicity" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" \
+  -d '{"text": "You are wonderful!"}' | python3 -m json.tool
+
+# Sentiment
+curl -s -X POST "$BASE/sentiment" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" \
+  -d '{"text": "Best product ever!"}' | python3 -m json.tool
+
+# Entities
+curl -s -X POST "$BASE/entities" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" \
+  -d '{"text": "Satya Nadella leads Microsoft from Redmond."}' | python3 -m json.tool
+
+# PII
+curl -s -X POST "$BASE/pii" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" \
+  -d '{"text": "Email me at test@test.com, SSN 123-45-6789"}' | python3 -m json.tool
+
+# Language
+curl -s -X POST "$BASE/language" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" \
+  -d '{"text": "Bonjour le monde"}' | python3 -m json.tool
+
+# Health
+curl -s "$BASE/health" -H "Authorization: Bearer $KEY" | python3 -m json.tool
+```
+
+## MCP Server
+
+### Configuration
+
+```json
+{
+  "mcpServers": {
+    "brainiall-nlp": {
+      "url": "https://apim-ai-apis.azure-api.net/mcp/nlp/mcp",
+      "headers": {
+        "Accept": "application/json, text/event-stream"
+      }
+    }
+  }
+}
+```
+
+### Tools
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| analyze_toxicity | Detect toxic content (6 categories) | text (string) |
+| analyze_sentiment | Positive/negative sentiment | text (string) |
+| extract_entities | NER: PER, ORG, LOC, MISC | text (string) |
+| detect_pii | Find emails, phones, SSNs, credit cards | text (string) |
+| detect_language | Identify language (217 supported) | text (string) |
+| check_nlp_service | Health check | none |
+
+## Pricing
+
+| Endpoint | Price per request | Monthly cost (1M requests) |
+|----------|------------------|---------------------------|
+| Toxicity | $0.001 | $1,000 |
+| Sentiment | $0.001 | $1,000 |
+| Entities | $0.002 | $2,000 |
+| PII | $0.002 | $2,000 |
+| Language | $0.0005 | $500 |
+
+Compare: AWS Comprehend = $500/1M, Azure Text Analytics = $700/1M, GPT-4o = $2,500/1M
+
+## Models
+
+All models are ONNX-optimized for CPU inference:
+
+- Toxicity: Multi-label BERT classifier (6 toxic categories)
+- Sentiment: DistilBERT fine-tuned on SST-2
+- NER: BERT-base fine-tuned on CoNLL-2003
+- PII: Regex + pattern matching (email, phone, SSN, credit card)
+- Language: fastText lid.176.ftz (217 languages, <1ms)
+
+## Links
+
+- Website: https://brainiall.com
+- Get API Key: https://brainiall.com
+- LLM Gateway: https://github.com/fasuizu-br/brainiall-llm-gateway
+- Image APIs: https://github.com/fasuizu-br/brainiall-image-api
+- Speech AI: https://github.com/fasuizu-br/speech-ai-examples

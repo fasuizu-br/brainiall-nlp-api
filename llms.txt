@@ -1,0 +1,41 @@
+# Brainiall NLP API
+
+> Suite of ONNX-optimized NLP APIs: toxicity detection, sentiment analysis, NER, PII detection, language detection. 100-1000x cheaper than LLMs.
+
+## Base URL
+
+https://apim-ai-apis.azure-api.net/v1/nlp
+
+## Authentication
+
+Use any one of: `Authorization: Bearer KEY`, `api-key: KEY`, or `Ocp-Apim-Subscription-Key: KEY`
+
+## Endpoints
+
+- POST /v1/nlp/toxicity — Detect toxic content (6 categories)
+- POST /v1/nlp/sentiment — Positive/negative sentiment analysis
+- POST /v1/nlp/entities — Named Entity Recognition (PER, ORG, LOC, MISC)
+- POST /v1/nlp/pii — PII detection (email, phone, SSN, credit card)
+- POST /v1/nlp/language — Language detection (217 languages)
+- GET /v1/nlp/health — Service health check
+
+## Pricing
+
+- Toxicity: $0.001/request
+- Sentiment: $0.001/request
+- Entities: $0.002/request
+- PII: $0.002/request
+- Language: $0.0005/request
+
+## MCP Server
+
+URL: https://apim-ai-apis.azure-api.net/mcp/nlp/mcp
+Tools: analyze_toxicity, analyze_sentiment, extract_entities, detect_pii, detect_language
+
+## Links
+
+- Documentation: https://github.com/fasuizu-br/brainiall-nlp-api
+- Full docs: https://github.com/fasuizu-br/brainiall-nlp-api/blob/main/llms-full.txt
+- Get API Key: https://brainiall.com
+- LLM Gateway: https://github.com/fasuizu-br/brainiall-llm-gateway
+- Image APIs: https://github.com/fasuizu-br/brainiall-image-api
